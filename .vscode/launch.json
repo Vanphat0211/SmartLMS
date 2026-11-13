@@ -1,0 +1,10 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "type": "node-terminal", "request": "launch", "name": "Chạy web (Vite)", "command": "npm run dev" },
+    { "type": "node-terminal", "request": "launch", "name": "Kiểm thử backend (PGlite)", "command": "npm test" },
+    { "type": "node-terminal", "request": "launch", "name": "Giả lập IoT + Edge AI", "command": "npm run sim -- ${input:session}" },
+    { "type": "node-terminal", "request": "launch", "name": "Đánh giá tải (bench)", "command": "npm run bench -- ${input:session}" }
+  ],
+  "inputs": [{ "id": "session", "type": "promptString", "description": "Số phiên thi (hiện trên màn hình thi)" }]
+}
