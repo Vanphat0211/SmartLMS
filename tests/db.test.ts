@@ -16,28 +16,29 @@ alter default privileges in schema public grant all on tables to anon, authentic
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 `;
+type Row = Record<string, any>;
 const db = await PGlite.create();
 await db.exec(SUPABASE_STUB);
 for (const f of fs.readdirSync('supabase/migrations').sort()) await db.exec(fs.readFileSync(`supabase/migrations/${f}`, 'utf8'));
 
 // Chạy SQL như một người dùng đã đăng nhập (uid) hoặc anon (null) — giống request qua PostgREST.
-const as = async (uid, sql, params = []) => {
-  await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid ?? '']);
+const as = async (uid: string | null, sql: string, params: unknown[] = []): Promise<Row[]> => {
+  await db.query<Row>(`select set_config('request.jwt.claim.sub', $1, false)`, [uid ?? '']);
   await db.exec(`set role ${uid ? 'authenticated' : 'anon'}`);
-  try { return (await db.query(sql, params)).rows; } finally { await db.exec('reset role'); }
+  try { return (await db.query<Row>(sql, params)).rows; } finally { await db.exec('reset role'); }
 };
-const one = async (...a) => (await as(...a))[0];
-const fails = (uid, sql, params, re) => assert.rejects(as(uid, sql, params), re);
+const one = async (...a: Parameters<typeof as>): Promise<Row> => (await as(...a))[0];
+const fails = (uid: string | null, sql: string, params: unknown[] | undefined, re: RegExp, _why?: string) => assert.rejects(as(uid, sql, params), re);
 
 // ---- dữ liệu mẫu (tài khoản do admin cấp: vai trò đi qua app_metadata như Edge Function admin-users làm) ----
-const U = {};
+const U: Record<string, string> = {};
 for (const [k, name, role, listed] of [['gv', 'Nguyễn Văn An', 'teacher', true], ['sv', 'Trần Minh Khoa', 'student', true],
-  ['ad', 'Lê Thu Hà', 'admin', true], ['sv2', 'Phạm Gia Huy', 'student', true], ['sv3', 'Võ Ngọc Lan', 'student', false]]) {
+  ['ad', 'Lê Thu Hà', 'admin', true], ['sv2', 'Phạm Gia Huy', 'student', true], ['sv3', 'Võ Ngọc Lan', 'student', false]] as [string, string, string, boolean][]) {
   // Giống Supabase Auth (Admin API createUser): INSERT user trước, rồi mới ghi app_metadata bằng một lệnh UPDATE riêng.
-  U[k] = (await db.query(`insert into auth.users (email, raw_user_meta_data, raw_app_meta_data) values ($1, $2, '{"provider":"email"}') returning id`,
+  U[k] = (await db.query<Row>(`insert into auth.users (email, raw_user_meta_data, raw_app_meta_data) values ($1, $2, '{"provider":"email"}') returning id`,
     [`${k}@demo.vn`, JSON.stringify({ name })])).rows[0].id;
-  await db.query(`update auth.users set raw_app_meta_data = raw_app_meta_data || jsonb_build_object('role', $1::text) where id = $2`, [role, U[k]]);
-  if (!listed) await db.query('update profiles set listed = false where id = $1', [U[k]]);
+  await db.query<Row>(`update auth.users set raw_app_meta_data = raw_app_meta_data || jsonb_build_object('role', $1::text) where id = $2`, [role, U[k]]);
+  if (!listed) await db.query<Row>('update profiles set listed = false where id = $1', [U[k]]);
 }
 // Admin tạo lớp học phần (học kỳ 2026-1, nhóm 01), phân công GV, ghi danh SV.
 await as(U.ad, `insert into courses (code, title, term, section, teacher_id) values
@@ -48,16 +49,16 @@ for (const [t, o, a, clo] of [['ESP32 là gì?', ['Vi điều khiển có WiFi',
   await as(U.gv, 'select add_question(1, $1, $2, $3, $4)', [t, JSON.stringify(o), a, clo]);
 await as(U.gv, `insert into exams (course_id, title, minutes, opens_at, closes_at) values (1, 'Giữa kỳ', 10, now() - interval '1 hour', now() + interval '1 hour')`);
 await as(U.gv, `insert into assignments (course_id, title, due_at) values (2, 'Lab 6', now() + interval '1 day')`);
-await db.query(`insert into devices (name, room, key_hash) values ('Camera Edge A1.101', 'A1.101', sha256_hex('dev-key-123'))`);
-let sid;
+await db.query<Row>(`insert into devices (name, room, key_hash) values ('Camera Edge A1.101', 'A1.101', sha256_hex('dev-key-123'))`);
+let sid: number;
 
 test('profile tạo tự động: vai trò theo app_metadata (admin cấp), không có thì là sinh viên', async () => {
-  const roles = Object.fromEntries((await db.query('select email, role from profiles')).rows.map((r) => [r.email, r.role]));
+  const roles = Object.fromEntries((await db.query<Row>('select email, role from profiles')).rows.map((r) => [r.email, r.role]));
   assert.deepEqual([roles['gv@demo.vn'], roles['ad@demo.vn'], roles['sv@demo.vn']], ['teacher', 'admin', 'student']);
-  await db.query(`insert into auth.users (email) values ('moi@demo.vn')`);
+  await db.query<Row>(`insert into auth.users (email) values ('moi@demo.vn')`);
   // user_metadata do người dùng tự gửi khi đăng ký → không được dùng để nâng quyền
-  await db.query(`insert into auth.users (email, raw_user_meta_data) values ('hack@demo.vn', '{"role":"admin"}')`);
-  assert.deepEqual((await db.query(`select role from profiles where email in ('moi@demo.vn', 'hack@demo.vn')`)).rows.map((r) => r.role), ['student', 'student']);
+  await db.query<Row>(`insert into auth.users (email, raw_user_meta_data) values ('hack@demo.vn', '{"role":"admin"}')`);
+  assert.deepEqual((await db.query<Row>(`select role from profiles where email in ('moi@demo.vn', 'hack@demo.vn')`)).rows.map((r) => r.role), ['student', 'student']);
 });
 
 test('phân quyền theo khóa học', async () => {
@@ -131,7 +132,7 @@ test('bài tập: nộp → chấm → khóa nộp lại', async () => {
   await as(U.sv, 'update submissions set grade = 10 where id = $1', [id]); // không có policy → không đổi gì
   await as(U.gv, `select grade_submission($1, 9, 'Tốt')`, [id]);
   await fails(U.sv, `select submit_assignment(1, 'again')`, [], /đã được chấm/);
-  assert.equal(Number((await as(U.sv, 'select * from grade_book()')).find(g => g.item === 'Lab 6').score), 9);
+  assert.equal(Number((await as(U.sv, 'select * from grade_book()')).find(g => g.item === 'Lab 6')!.score), 9);
   assert.equal((await as(U.sv, 'select * from grade_book()')).every(g => g.student === 'Trần Minh Khoa'), true, 'student sees only own grades');
   assert.ok((await as(U.sv, 'select * from my_agenda()')).some(x => x.kind === 'assignment' && x.done));
 });
@@ -142,7 +143,7 @@ test('quản trị tài khoản: chỉ admin đổi vai trò, có chốt an toà
   await fails(U.ad, `select admin_set_role($1, 'student')`, [U.ad], /chính mình/);
   await fails(U.ad, `select admin_set_role($1, 'student')`, [U.gv], /đang phụ trách khóa học/);
   await as(U.ad, `select admin_set_role($1, 'teacher')`, [U.sv2]);
-  assert.equal((await db.query('select role from profiles where id = $1', [U.sv2])).rows[0].role, 'teacher');
+  assert.equal((await db.query<Row>('select role from profiles where id = $1', [U.sv2])).rows[0].role, 'teacher');
   await as(U.ad, `select admin_set_role($1, 'student')`, [U.sv2]);
   assert.equal((await as(U.ad, 'select * from profiles')).length, 7, 'admin lists every account, listed or not');
 });
@@ -178,7 +179,7 @@ test('điểm bài thi: chấm ngay, GV chọn cho xem hoặc ẩn đến khi c�
   await fails(U.sv2, 'select score from exam_sessions', [], /permission denied/);
   assert.equal((await one(U.sv2, 'select score from session_overview where id = $1', [s2])).score, null);
   assert.equal((await one(U.sv2, 'select session_score($1) v', [s2])).v, null);
-  assert.equal((await as(U.sv2, 'select * from grade_book()')).find((g) => g.item === 'Cuối kỳ').score, null);
+  assert.equal((await as(U.sv2, 'select * from grade_book()')).find((g) => g.item === 'Cuối kỳ')!.score, null);
   assert.equal((await as(U.sv2, 'select * from outcome_performance()')).every((o) => o.attempts === 0), true, 'CLO results hidden too');
   assert.equal(Number((await one(U.gv, 'select score from session_overview where id = $1', [s2])).score), 10, 'teacher always sees');
   assert.equal((await one(U.sv2, 'select session_score($1) v', [sid])).v, null, "cannot read a classmate's score");
@@ -212,16 +213,16 @@ test('môn học theo học kỳ: admin quản lý, nhập đăng ký từ edu, 
   assert.deepEqual(r.map((x) => x.status), ['enrolled', 'pending', 'ambiguous', 'enrolled', 'not_student', 'invalid', 'no_course']);
   assert.deepEqual((await as(U.sv3, 'select id from courses order by id')).map((c) => Number(c.id)), [1, 2, c4], 'sv3 now sees registered courses');
   // tài khoản tạo sau → tự có môn đã đăng ký
-  const moi2 = (await db.query(`insert into auth.users (email) values ('moi2@demo.vn') returning id`)).rows[0].id;
+  const moi2 = (await db.query<Row>(`insert into auth.users (email) values ('moi2@demo.vn') returning id`)).rows[0].id;
   assert.deepEqual((await as(moi2, 'select code from courses')).map((c) => c.code), ['IT116IU']);
-  const before = (await db.query('select count(*)::int n from enrollments')).rows[0].n;
+  const before = (await db.query<Row>('select count(*)::int n from enrollments')).rows[0].n;
   await as(U.ad, `select * from import_registrations('2026-1', $1)`, [JSON.stringify(rows)]);
-  assert.equal((await db.query('select count(*)::int n from enrollments')).rows[0].n, before, 're-import adds nothing');
+  assert.equal((await db.query<Row>('select count(*)::int n from enrollments')).rows[0].n, before, 're-import adds nothing');
   // điều chuyển sang ca khác
   await fails(U.gv, 'select move_student($1, 2, $2)', [moi2, c4], /Chỉ quản trị viên/);
   await as(U.ad, 'select move_student($1, 2, $2)', [moi2, c4]);
   assert.deepEqual((await as(moi2, 'select id from courses')).map((c) => Number(c.id)), [c4]);
-  assert.deepEqual((await db.query(`select course_id from registrations where email = 'moi2@demo.vn'`)).rows.map((x) => Number(x.course_id)), [c4]);
+  assert.deepEqual((await db.query<Row>(`select course_id from registrations where email = 'moi2@demo.vn'`)).rows.map((x) => Number(x.course_id)), [c4]);
   await fails(U.ad, 'select move_student($1, 2, $2)', [moi2, c4], /không thuộc lớp/);
 });
 
@@ -254,7 +255,7 @@ test('cổng thông tin: công việc, email, danh bạ, thông báo', async () 
   await fails(U.sv, `update profiles set role = 'admin' where id = $1`, [U.sv], /permission denied/);
   await fails(U.sv, `update profiles set active = true where id = $1`, [U.sv], /permission denied/);
   await as(U.sv, `update profiles set name = 'Khoa', listed = false where id = $1`, [U.sv]);
-  assert.equal((await db.query('select name from profiles where id = $1', [U.sv])).rows[0].name, 'Khoa');
+  assert.equal((await db.query<Row>('select name from profiles where id = $1', [U.sv])).rows[0].name, 'Khoa');
 
   await fails(U.sv, `insert into announcements (title) values ('x')`, [], /row-level security/);
   await fails(U.gv, `insert into announcements (title) values ('x')`, [], /row-level security/, 'teacher posts to own course only');
@@ -268,7 +269,7 @@ test('cổng thông tin: công việc, email, danh bạ, thông báo', async () 
 test('sửa nhật ký trong DB → chuỗi băm gãy', async () => {
   await as(U.sv, `update events set type = 'nothing'`); // qua API: không có policy → không đổi gì
   assert.equal((await one(U.ad, 'select verify_chain($1) r', [sid])).r.ok, true);
-  await db.query(`update events set type = 'nothing' where type = 'multi_person'`); // quản trị DB sửa trực tiếp
+  await db.query<Row>(`update events set type = 'nothing' where type = 'multi_person'`); // quản trị DB sửa trực tiếp
   const v = (await one(U.ad, 'select verify_chain($1) r', [sid])).r;
   assert.deepEqual(v, { ok: false, broken_at: 3 });
   assert.equal((await one(U.ad, 'select system_report() r')).r.broken.length, 1);

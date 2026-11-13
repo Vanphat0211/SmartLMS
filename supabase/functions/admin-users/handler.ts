@@ -37,7 +37,7 @@ export async function handle(req: Request, db: SupabaseClient): Promise<Response
     if (password.length < 6) return json({ error: 'Mật khẩu tối thiểu 6 ký tự' }, 400);
     const users = Array.isArray(body.users) ? body.users : [];
     if (!users.length || users.length > MAX_BATCH) return json({ error: 'Cần từ 1 đến 200 tài khoản mỗi lần' }, 400);
-    const results = [];
+    const results: { email: string; ok: boolean; error?: string }[] = [];
     for (const u of users) { // tuần tự để không chạm giới hạn tốc độ của Auth
       const email = String(u?.email ?? '').trim().toLowerCase();
       const { error } = await db.auth.admin.createUser({

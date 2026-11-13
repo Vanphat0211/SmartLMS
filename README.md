@@ -36,8 +36,8 @@ Mọi luật nghiệp vụ nằm trong [supabase/migrations](supabase/migrations
 │  ├─ migrations/              schema + RLS + RPC (nguồn sự thật của backend), áp theo thứ tự tên file
 │  └─ functions/admin-users/   Edge Function quản trị tài khoản (handler.ts tách riêng để kiểm thử)
 ├─ scripts/
-│  ├─ device-sim.mjs           giả lập cảm biến IoT + camera Edge AI
-│  └─ bench.mjs                đo thông lượng / độ trễ nhận sự kiện
+│  ├─ device-sim.ts           giả lập cảm biến IoT + camera Edge AI
+│  └─ bench.ts                đo thông lượng / độ trễ nhận sự kiện
 └─ tests/                      db (PGlite, không cần Docker), admin-users (Edge Function), i18n (đủ bản dịch)
 ```
 

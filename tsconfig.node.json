@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"], "allowImportingTsExtensions": true, "noImplicitAny": false, "noUnusedLocals": false },
+  "include": ["scripts", "tests", "supabase/functions/admin-users/handler.ts", "src/lib/en.ts"]
+}

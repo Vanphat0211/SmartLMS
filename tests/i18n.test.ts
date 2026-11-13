@@ -12,7 +12,7 @@ const unescape = (s) => s.replace(/\\(.)/g, (_, c) => ({ n: '\n', t: '\t' })[c] 
 
 function usedKeys() {
   const keys = new Set(['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'Bài tập', 'Kỳ thi']); // khóa động: thứ trong tuần, grade_book.kind
-  for (const f of fs.readdirSync(new URL('src', root), { recursive: true }).filter((f) => /\.tsx?$/.test(f) && !/(i18n|en)\.ts$/.test(f)))
+  for (const f of fs.readdirSync(new URL('src', root), { recursive: true, encoding: 'utf8' }).filter((f) => /\.tsx?$/.test(f) && !/(i18n|en)\.ts$/.test(f)))
     for (const m of read('src/' + f).matchAll(/\bt\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)")/g)) keys.add(unescape(m[1] ?? m[2]));
   for (const f of fs.readdirSync(new URL('supabase/migrations', root))) {
     const sql = read('supabase/migrations/' + f);

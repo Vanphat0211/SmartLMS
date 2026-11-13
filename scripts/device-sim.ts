@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 const [sid, secs = 30] = process.argv.slice(2).map(Number);
 const KEY = process.env.DEVICE_KEY || 'dev-key-123';
 if (!sid) { console.error('Thiếu session_id (số phiên hiện trên màn hình thi)'); process.exit(1); }
-const sb = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const sb = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
 
 const post = (source, type, detail, dts) =>
   sb.rpc('device_event', { p_key: KEY, p_session: sid, p_source: source, p_type: type, p_detail: detail, p_dts: dts })

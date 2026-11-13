@@ -3,25 +3,25 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handle } from '../supabase/functions/admin-users/handler.ts';
 
-function fakeDb(role, active = true) {
-  const calls = [];
+function fakeDb(role: string | null, active = true) {
+  const calls: any[][] = [];
   const db = {
     calls,
     auth: {
-      getUser: async (jwt) => ({ data: { user: jwt === 'good' ? { id: 'me' } : null } }),
+      getUser: async (jwt: string) => ({ data: { user: jwt === 'good' ? { id: 'me' } : null } }),
       admin: {
-        createUser: async (a) => { calls.push(['create', a]); return { error: a.email === 'trung@x.vn' ? { message: 'A user with this email address has already been registered' } : null }; },
-        updateUserById: async (id, a) => { calls.push(['auth', id, a]); return { error: null }; },
+        createUser: async (a: any) => { calls.push(['create', a]); return { error: a.email === 'trung@x.vn' ? { message: 'A user with this email address has already been registered' } : null }; },
+        updateUserById: async (id: string, a: any) => { calls.push(['auth', id, a]); return { error: null }; },
       },
     },
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: role ? { role, active } : null }) }) }),
-      update: (v) => ({ eq: async (_c, id) => { calls.push(['profile', id, v]); return { error: null }; } }),
+      update: (v: any) => ({ eq: async (_c: string, id: string) => { calls.push(['profile', id, v]); return { error: null }; } }),
     }),
   };
   return db;
 }
-const call = async (db, body, jwt = 'good') => {
+const call = async (db: any, body: any, jwt = 'good') => {
   const res = await handle(new Request('http://x/admin-users', { method: 'POST', headers: { Authorization: `Bearer ${jwt}` }, body: JSON.stringify(body) }), db);
   return [res.status, await res.json()];
 };
