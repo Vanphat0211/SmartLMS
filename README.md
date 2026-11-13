@@ -38,8 +38,7 @@ Mọi luật nghiệp vụ nằm trong [supabase/migrations](supabase/migrations
 ├─ scripts/
 │  ├─ device-sim.mjs           giả lập cảm biến IoT + camera Edge AI
 │  └─ bench.mjs                đo thông lượng / độ trễ nhận sự kiện
-├─ tests/                      db (PGlite, không cần Docker), admin-users (Edge Function), i18n (đủ bản dịch)
-└─ legacy/                     bản demo Node + SQLite cũ (tham khảo, có thể xóa)
+└─ tests/                      db (PGlite, không cần Docker), admin-users (Edge Function), i18n (đủ bản dịch)
 ```
 
 ## Cài đặt
